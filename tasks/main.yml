@@ -1,20 +1,42 @@
 ---
-- name: Download makemine tarball
-  get_url:
-    url: https://github.com/natemarks/makemine/releases/download/v{{ version }}/makemine_{{ version }}_linux_amd64.tar.gz
-    dest: ~/makemine_{{ version }}_linux_amd64.tar.gz
-    checksum: sha1:{{ sha256 }}
-    mode: '0644'
+- name: Create lansweeper extract directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ download }}"
+    - "{{ extract }}"
 
-- name: Extract /tmp/makemine_{{ version }}_linux_amd64.tar.gz in /tmp
-  ansible.builtin.unarchive:
-    src: "{{ ansible_env.HOME }}/makemine_{{ version }}_linux_amd64.tar.gz"
-    dest: "{{ ansible_env.HOME }}"
+- name: Download lansweeper package
+  become: no
+  command: aws s3 cp {{ s3_uri }} {{ extract }} --quiet
+  environment:
+    AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+    AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+  register: lsdl
+  args:
+    creates: "{{ extract }}/{{ installer }}"
 
-- name: Copy makemine to /usr/local/bin
-  become: yes
-  ansible.builtin.copy:
-    src: "{{ ansible_env.HOME }}/makemine"
-    dest: /usr/local/bin/makemine
+- name: Download output
+  debug:
+    msg: "lansweeper bucket: {{ lsdl.stdout }}"
+
+- name: Make lansweeper installer executable
+  ansible.builtin.file:
+    path: "{{ extract }}/{{ installer }}"
     mode: '0755'
-  
+
+- name: Run lansweeper installer
+  become: yes
+  command: "./{{ installer }} --port {{ lansweeper_port }} --agentkey {{ agentkey }} --mode unattended"
+  args:
+    chdir: "{{ extract }}"
+    creates: /opt/LansweeperAgent
+  register: lsinst
+  changed_when: lsinst.rc == 0
+  # the installer will fail in docker because of a non-existent dir
+
+- name: Installer output
+  debug:
+    msg: "lansweeper installer: {{ lsinst.stdout }}"

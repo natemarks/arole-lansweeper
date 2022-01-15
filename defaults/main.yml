@@ -1,4 +1,5 @@
 ---
-# defaults file for ansible-role-bash
-version: "0.0.5"
-sha256: "39dfe437f57a8587262168f617638b9354535eea"
+download: "{{ ansible_env.HOME }}/.lansweeper_downloads"
+extract: "{{ download }}/lansweeper"
+installer: LsAgent-linux-x64_8.4.100.35.run
+lansweeper_port: '9524'
